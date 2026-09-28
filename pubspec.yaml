@@ -2,8 +2,6 @@ name: flutter_animated_media
 description: Unicode-aware animated emojis, configurable stickers, and searchable media catalogs with lifecycle-aware playback and bounded caching.
 version: 0.1.0
 homepage: https://pub.dev/packages/flutter_animated_media
-repository: https://github.com/lrferreiro/flutter_animated_media
-issue_tracker: https://github.com/lrferreiro/flutter_animated_media/issues
 topics:
   - emoji
   - animation
