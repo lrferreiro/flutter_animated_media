@@ -1,0 +1,65 @@
+import 'package:animated_emoji/animated_emoji.dart' as noto;
+import 'package:characters/characters.dart';
+
+import '../models/media_item.dart';
+import '../models/media_source.dart';
+import 'local_media_catalog.dart';
+
+/// Noto metadata from the pinned animated_emoji 3.3.0 catalog.
+///
+/// A declared package asset is preferred. Other supported entries use Google's
+/// mutable CDN and a bounded TTL; the catalog version is not an artwork hash.
+final class NotoEmojiCatalog extends LocalMediaCatalog {
+  NotoEmojiCatalog() : super(_entries) {
+    _byUnicode = {for (final item in items) item.unicode!: item};
+    // Explicit presentation alias; never strip selectors or skin tones globally.
+    final heart = _byUnicode['❤️'];
+    if (heart != null) _byUnicode['❤'] = heart;
+  }
+
+  static final NotoEmojiCatalog instance = NotoEmojiCatalog();
+  static const catalogVersion = 'animated_emoji-3.3.0';
+  static final _attribution = MediaAttribution(
+    author: 'Google',
+    source: Uri.parse('https://googlefonts.github.io/noto-emoji-files/'),
+    license: 'CC BY 4.0',
+    licenseUrl: Uri.parse('https://creativecommons.org/licenses/by/4.0/'),
+  );
+  static final List<MediaItem> _entries = [
+    for (final base in noto.AnimatedEmojis.values)
+      for (final variant in base.variations)
+        MediaItem(
+          id: variant.id,
+          provider: 'google-noto',
+          version: catalogVersion,
+          name: variant.name,
+          kind: MediaKind.emoji,
+          format: MediaFormat.lottie,
+          unicode: variant.toUnicodeEmoji(),
+          width: 512,
+          height: 512,
+          categories: base.categories,
+          keywords: [...base.tags, base.name],
+          source: MediaSource.asset(
+            'packages/animated_emoji/lottie/${variant.name}.json',
+            fallbackUri: Uri.parse(
+              'https://fonts.gstatic.com/s/e/notoemoji/latest/${variant.id}/lottie.json',
+            ),
+          ),
+          attribution: _attribution,
+        ),
+  ];
+  late final Map<String, MediaItem> _byUnicode;
+
+  /// Resolves one complete supported emoji without altering the caller's text.
+  /// Explicit text presentation (VS15) remains static.
+  MediaItem? resolve(String text) {
+    final value = text.trim();
+    if (value.isEmpty ||
+        value.contains('\uFE0E') ||
+        value.characters.length != 1) {
+      return null;
+    }
+    return _byUnicode[value];
+  }
+}
