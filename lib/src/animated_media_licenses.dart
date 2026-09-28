@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 bool _registered = false;
 
-/// Registers Noto attribution and the complete CC BY 4.0 text once per isolate.
+/// Registers Noto artwork and catalog licenses once per isolate.
 /// Call after initializing Flutter, and expose the app's license screen.
 void registerAnimatedMediaLicenses() {
   if (_registered) return;
@@ -18,5 +18,11 @@ void registerAnimatedMediaLicenses() {
     yield LicenseEntryWithLineBreaks(const [
       'Animated Noto Emoji (Google)',
     ], '$notices\n\n$license');
+    final metadataLicense = await rootBundle.loadString(
+      'packages/flutter_animated_media/licenses/Apache-2.0.txt',
+    );
+    yield LicenseEntryWithLineBreaks(const [
+      'Google Emoji Metadata',
+    ], '$notices\n\n$metadataLicense');
   });
 }

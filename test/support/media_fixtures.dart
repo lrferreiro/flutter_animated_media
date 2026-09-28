@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_animated_media/flutter_animated_media.dart';
+import 'package:flutter_animated_media/src/playback/lottie_composition_cache.dart';
 
 // Reuse the original sample fixture; the package does not depend on the example.
 // ignore: avoid_relative_lib_imports
@@ -29,6 +30,12 @@ MediaItem fixture({
 );
 
 Uint8List get pulseBytes => Uint8List.fromList(utf8.encode(pulseJson));
+
+// Decode the original fixture with the production isolate before fake-clock
+// widget tests. Cold/background decoding is covered separately by cache tests.
+Future<void> warmFixtureComposition() async {
+  await LottieCompositionCache.instance.decode(pulseBytes);
+}
 
 class FakeMediaLoader implements MediaLoader {
   FakeMediaLoader({this.bytes, this.error});

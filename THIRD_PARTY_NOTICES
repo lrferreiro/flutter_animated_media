@@ -10,31 +10,29 @@ The Noto animation files used by this package are not modified. The package
 selects their playback frame and scales their display without rewriting the
 source artwork. No endorsement by Google is implied.
 
-Catalog metadata and optional assets are supplied by animated_emoji 3.3.0.
-The remote fallback uses Google's mutable /latest/ endpoint. Catalog revision
-and artwork revision are distinct; downloaded files expire after one day by
-default. Applications requiring fully reproducible artwork should declare
-selected assets from the pinned dependency instead of relying on remote files.
+Artwork is bundled as an immutable local snapshot of Google's official JSON
+files. assets/noto/manifest.json records each source URL, byte size and SHA-256.
+There is no runtime CDN fallback. No Noto GIF files are redistributed.
 
-animated_emoji (BSD-3-Clause)
-===========================
-Copyright 2026 Clever Tasks
+Google Emoji Metadata
+=====================
+Source: https://github.com/googlefonts/emoji-metadata
+Revision: 173b9b26e8fcbcbe64e1ecbf073a21a96b95c6b1
+File: emoji_17_0_ordering.json
+License: Apache License, Version 2.0
+Full license: licenses/Apache-2.0.txt
 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+The generated Dart catalog is a derived subset of Google's metadata: animated
+entries and their alternates are selected, categories are combined, and names
+and keywords are formed from shortcodes, emoticons and Unicode skin tones.
+Artwork bytes are unchanged. No endorsement by Google is implied.
 
 Other dependencies
 ==================
 Lottie, Flutter, characters, crypto, http, path_provider and visibility_detector
 retain their own licenses. Flutter includes dependency LICENSE notices in its
-generated license registry. No code or data from dart_animated_emoji is used.
+generated license registry. No code or data from third-party animated-emoji
+packages is incorporated.
 
 Example fixtures
 ================

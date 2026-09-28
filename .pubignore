@@ -1,0 +1,29 @@
+# Keep generated output and local configuration out of the published archive.
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+doc/api/
+.DS_Store
+*.log
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+pubspec_overrides.yaml
+
+# Development resources remain in the source repository.
+/pubspec.lock
+/test/
+/tool/
+/example/pubspec.lock
+/example/pubspec_overrides.yaml
+/example/test/
+/example/integration_test/
+/example/ios/
+/example/.dart_tool/
+/example/.flutter-plugins-dependencies
+/example/build/

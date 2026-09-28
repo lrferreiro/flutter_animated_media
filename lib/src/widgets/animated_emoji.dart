@@ -12,6 +12,8 @@ class AnimatedEmoji extends StatelessWidget {
     super.key,
     this.size = 48,
     this.animate = true,
+    this.pauseWhileScrolling = true,
+    this.fadeDuration = const Duration(milliseconds: 180),
     this.maxCycles,
     this.controller,
     this.loader,
@@ -23,6 +25,12 @@ class AnimatedEmoji extends StatelessWidget {
   final String emoji;
   final double size;
   final bool animate;
+
+  /// Defers animation loading and pauses playback during scrolling.
+  final bool pauseWhileScrolling;
+
+  /// Duration of the fade from the original glyph to its loaded animation.
+  final Duration fadeDuration;
   final int? maxCycles;
   final MediaPlaybackController? controller;
   final MediaLoader? loader;
@@ -48,6 +56,8 @@ class AnimatedEmoji extends StatelessWidget {
       width: size,
       height: size,
       animate: animate,
+      pauseWhileScrolling: pauseWhileScrolling,
+      fadeDuration: fadeDuration,
       maxCycles: maxCycles,
       controller: controller,
       loader: loader,

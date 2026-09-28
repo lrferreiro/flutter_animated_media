@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animated_media/flutter_animated_media.dart';
 import 'package:flutter_animated_media/src/playback/lottie_composition_cache.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,27 +10,91 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/media_fixtures.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final catalog = NotoEmojiCatalog.instance;
 
-  test('real pinned Noto assets decode with the selected renderer', () async {
-    final configFile = File('.dart_tool/package_config.json');
-    final config =
-        jsonDecode(await configFile.readAsString()) as Map<String, dynamic>;
-    final dependency = (config['packages'] as List)
-        .cast<Map<String, dynamic>>()
-        .singleWhere((entry) => entry['name'] == 'animated_emoji');
-    final root = configFile.absolute.uri.resolve(
-      '${dependency['rootUri'].toString().replaceFirst(RegExp(r'/$'), '')}/',
-    );
-    final library = root.resolve(dependency['packageUri'] as String);
-    for (final glyph in ['😀', '❤️', '👍🏽', '🚀', '🔥']) {
-      final item = catalog.resolve(glyph)!;
-      final uri = library.resolve(
-        item.source.identity.replaceFirst('packages/animated_emoji/', ''),
+  test(
+    'every bundled Noto JSON matches its snapshot and decodes offline',
+    () async {
+      final manifest =
+          jsonDecode(await File('assets/noto/manifest.json').readAsString())
+              as Map<String, dynamic>;
+      final entries = {
+        for (final entry
+            in (manifest['entries'] as List).cast<Map<String, dynamic>>())
+          entry['id'] as String: entry,
+      };
+      expect(manifest['version'], NotoEmojiCatalog.catalogVersion);
+      expect(entries.length, 881);
+      expect(catalog.items.length, entries.length);
+      var networkCalls = 0;
+      final loader = CachedMediaLoader(
+        clientFactory: () {
+          networkCalls++;
+          throw StateError('Network is unavailable');
+        },
       );
-      final bytes = await File.fromUri(uri).readAsBytes();
-      final composition = await LottieCompositionCache.instance.decode(bytes);
-      expect(composition.duration, greaterThan(Duration.zero));
+      final compositions = LottieCompositionCache();
+      for (final item in catalog.items) {
+        final entry = entries[item.id]!;
+        final file = entry['lottie'] as Map<String, dynamic>;
+        expect(item.source.isAsset, isTrue);
+        expect(item.source.fallbackUri, isNull);
+        expect(item.source.uri, isNull);
+        expect(
+          item.source.identity,
+          'packages/flutter_animated_media/${file['path']}',
+        );
+        expect(catalog.resolve(entry['unicode'] as String)?.id, item.id);
+        final bytes = await loader.load(item);
+        expect(bytes.length, file['bytes'], reason: item.id);
+        expect(
+          sha256.convert(bytes).toString(),
+          file['sha256'],
+          reason: item.id,
+        );
+        final composition = await compositions.decode(bytes);
+        expect(
+          composition.duration,
+          greaterThan(Duration.zero),
+          reason: item.id,
+        );
+      }
+      expect(networkCalls, 0);
+      await loader.clear();
+      compositions.clear();
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test('missing Noto assets never fall back to a remote provider', () async {
+    var networkCalls = 0;
+    final loader = CachedMediaLoader(
+      assetLoader: (_) async => throw StateError('Missing bundled asset'),
+      clientFactory: () {
+        networkCalls++;
+        throw StateError('Network is unavailable');
+      },
+    );
+    await expectLater(loader.load(catalog.resolve('😀')!), throwsStateError);
+    expect(networkCalls, 0);
+  });
+
+  test('the package asset manifest declares the entire Noto catalog', () async {
+    final assets = await AssetManifest.loadFromAssetBundle(rootBundle);
+    final declared = assets.listAssets().toSet();
+    for (final item in catalog.items) {
+      // Flutter lists an owning package's assets without its package prefix.
+      // The consuming-app prefix is verified by the integration tests.
+      expect(
+        declared,
+        contains(
+          item.source.identity.replaceFirst(
+            'packages/flutter_animated_media/',
+            '',
+          ),
+        ),
+      );
     }
   });
 
@@ -39,7 +105,7 @@ void main() {
     expect(catalog.resolve('👍🏿')?.unicode, '👍🏿');
     expect(
       catalog.resolve('👍🏽')?.source.identity,
-      contains('thumbsUpMedium'),
+      endsWith('/1f44d_1f3fd.json'),
     );
   });
 

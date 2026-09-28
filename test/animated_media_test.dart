@@ -9,6 +9,7 @@ import 'support/media_fixtures.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(warmFixtureComposition);
   setUp(() {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
   });
@@ -66,20 +67,21 @@ void main() {
     await disposeView(tester);
   });
 
-  testWidgets(
-    'decode errors evict corrupt content and retain the original glyph',
-    (tester) async {
-      final loader = FakeMediaLoader(bytes: Uint8List.fromList([1, 2, 3]));
-      await tester.pumpWidget(host(AnimatedEmoji('😀', loader: loader)));
-      await settleLoad(tester);
-      expect(find.text('😀'), findsOneWidget);
-      expect(tester.getSize(find.byType(AnimatedMedia)), const Size(48, 48));
-      expect(loader.evictions, 1);
-      await tester.pump(const Duration(seconds: 1));
-      expect(loader.calls, 1);
-      await disposeView(tester);
-    },
-  );
+  testWidgets('load errors evict content and retain the original glyph', (
+    tester,
+  ) async {
+    final loader = FakeMediaLoader(
+      error: const FormatException('Invalid media'),
+    );
+    await tester.pumpWidget(host(AnimatedEmoji('😀', loader: loader)));
+    await settleLoad(tester);
+    expect(find.text('😀'), findsOneWidget);
+    expect(tester.getSize(find.byType(AnimatedMedia)), const Size(48, 48));
+    expect(loader.evictions, 1);
+    await tester.pump(const Duration(seconds: 1));
+    expect(loader.calls, 1);
+    await disposeView(tester);
+  });
 
   testWidgets('ordinary parent rebuilds do not reload or restart', (
     tester,

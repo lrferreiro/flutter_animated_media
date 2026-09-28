@@ -11,6 +11,7 @@ import 'support/media_fixtures.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(warmFixtureComposition);
   setUp(() {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
   });

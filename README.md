@@ -4,6 +4,13 @@ Unicode-aware animated emojis, configurable stickers, and an embeddable media
 catalog. Rendering uses Flutter's Lottie player and image codecs; no account,
 commercial GIF API, backend, or chat framework is required.
 
+## Installation
+
+```yaml
+dependencies:
+  flutter_animated_media: ^0.1.0
+```
+
 ## Animated emojis
 
 ```dart
@@ -12,7 +19,7 @@ import 'package:flutter_animated_media/flutter_animated_media.dart';
 const AnimatedEmoji('👍🏽', size: 48, maxCycles: 2)
 ```
 
-The pinned Noto catalog includes base emojis and available skin-tone variants.
+The bundled Noto catalog includes base emojis and available skin-tone variants.
 Lookup uses complete Unicode grapheme clusters. Unsupported sequences, multiple
 emojis, and mixed text remain static. A bare red heart has an explicit emoji
 presentation alias; explicit text presentation (VS15) remains static. There is
@@ -22,11 +29,20 @@ Noto artwork replaces the system emoji visually; it does not animate an Apple
 or Android system glyph. Keep the original Unicode text as your application data.
 
 Loading and failure retain the original emoji inside a fixed-size box. Views
+cross-fade from the placeholder to loaded content over 180 ms; `fadeDuration`
+customizes the transition, and `Duration.zero` disables it. Reduced motion or
+`animate: false` also disables the fade. Parent rebuilds do not restart it. Views
 pause outside the viewport, when their app is inactive, under disabled
 `TickerMode`, or when reduced motion is requested. Visibility detection is
 coalesced by `visibility_detector` (500 ms by default), not instantaneous.
 Normal rebuilds retain the playhead. A Noto `rest` marker supplies a stable
 paused frame when available.
+
+By default, media inside a scrollable defers new loading/presentation while the
+list is being dragged or flung. Already loaded animations hold their current
+frame and resume when scrolling ends. Set `pauseWhileScrolling: false` to opt
+out. Network responses arriving during a scroll do not force immediate decoding
+or a new vector drawable into that scroll frame.
 
 ```dart
 final playback = MediaPlaybackController();
@@ -102,6 +118,11 @@ Storage failures do not prevent rendering a successfully loaded resource.
 
 Decoded vector compositions are separately limited to 24 entries and 4 MiB of
 encoded input weight. Actual decoded memory depends on artwork complexity.
+Native decoding runs in a background isolate, with one cold decode in flight
+at a time and deduplication for repeated artwork. On web, Flutter's `compute`
+uses the same event loop, so it does not provide parallel decoding there.
+The renderer keeps its animation controller stable instead of rebuilding its
+Lottie widget on every tick.
 Per-view Lottie raster-frame caching is intentionally disabled. These are three
 distinct caches, not one persistent cache implied by Lottie's rendering options.
 
@@ -109,20 +130,16 @@ Use `clearAnimatedMediaCache()` for shared defaults, or clear an injected loader
 separately. `AnimatedMediaScope` supplies a loader to a widget subtree without a
 global override.
 
-For offline or reproducible artwork, declare selected assets from the pinned
-`animated_emoji` dependency in the consuming application's asset list:
+All 881 supported Noto animations are bundled as local Lottie JSON. They work
+offline on first use, without asset declarations in the consuming app, remote
+fallbacks, startup downloads, or a dependency on another emoji package. The
+catalog is generated from Google's Emoji 17.0 metadata, and its artwork snapshot
+is identified by content hashes. Noto GIFs are not included; the generic raster
+renderer remains available for caller-supplied GIFs and other supported formats.
 
-```yaml
-flutter:
-  assets:
-    - packages/animated_emoji/lottie/smile.json
-    - packages/animated_emoji/lottie/thumbsUpMedium.json
-```
-
-Only explicitly declared artwork is bundled. Other supported entries use
-Google's mutable CDN and are not available on first use without connectivity.
-The pinned catalog revision is not a guarantee that remote artwork never changes.
-No complete-catalog download occurs at startup.
+Bundled artwork increases the application download size, but it is loaded and
+decoded on demand rather than all at once. Network and persistent-cache limits
+above also apply to custom remote media; Noto itself does not need connectivity.
 
 ## Attribution and licenses
 
@@ -130,16 +147,20 @@ Animated Noto Emoji by Google is licensed under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 See the [Noto source](https://googlefonts.github.io/noto-emoji-files/),
 `THIRD_PARTY_NOTICES`, and `licenses/CC-BY-4.0.txt`. Artwork is not relicensed as
-MIT. Dependency notices remain applicable; modified artwork must be identified.
+MIT. Catalog metadata comes directly from
+[Google Emoji Metadata](https://github.com/googlefonts/emoji-metadata) under
+Apache-2.0; the derived catalog preserves the complete Unicode sequences and
+available skin tones. See `licenses/Apache-2.0.txt`. Modified artwork must be
+identified.
 
 After initializing Flutter, call `registerAnimatedMediaLicenses()` and provide
 users with an accessible license screen, for example Flutter's `showLicensePage`.
 Registration is explicit and idempotent. It includes the Noto credit, source,
-license link, full license text and dependency attribution. A file hidden in an
+license link, full license text and catalog attribution. A file hidden in an
 application bundle is not a substitute for accessible attribution.
 
-New package code and original example fixtures use MIT. No EUPL code or data
-from `dart_animated_emoji` is incorporated.
+New package code and original example fixtures use MIT. No code, catalog, or
+assets are taken from third-party animated-emoji packages.
 
 ## Requirements and limitations
 

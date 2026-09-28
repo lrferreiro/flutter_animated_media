@@ -22,6 +22,8 @@ class AnimatedMedia extends StatefulWidget {
     this.height = 96,
     this.fit = BoxFit.contain,
     this.animate = true,
+    this.pauseWhileScrolling = true,
+    this.fadeDuration = const Duration(milliseconds: 180),
     this.maxCycles,
     this.controller,
     this.loader,
@@ -38,6 +40,14 @@ class AnimatedMedia extends StatefulWidget {
   final double height;
   final BoxFit fit;
   final bool animate;
+
+  /// Keeps existing frames still and defers new content until the nearest
+  /// scrollable is idle. This avoids competing with drag and fling frames.
+  final bool pauseWhileScrolling;
+
+  /// Cross-fades the placeholder into decoded content without resizing it.
+  /// Disabled when [animate] is false or reduced motion is requested.
+  final Duration fadeDuration;
 
   /// Null repeats indefinitely while visible and enabled.
   final int? maxCycles;
@@ -67,10 +77,20 @@ class _AnimatedMediaState extends State<AnimatedMedia>
   bool _reduceMotion = false;
   bool _active = false;
   int _loadRevision = 0;
+  int _contentRevision = 0;
   int _cycles = 0;
   int _replayRevision = 0;
   double _rest = 0;
+  double? _scrollFrame;
   MediaLoader? _scopeLoader;
+  ValueNotifier<bool>? _scrollingNotifier;
+  Completer<void>? _resumeLoading;
+
+  bool get _scrollPaused =>
+      widget.pauseWhileScrolling && (_scrollingNotifier?.value ?? false);
+
+  bool get _canPresent =>
+      _visible && _foreground && _tickerEnabled && !_scrollPaused;
 
   @override
   void initState() {
@@ -93,6 +113,14 @@ class _AnimatedMediaState extends State<AnimatedMedia>
     }
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
     _reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final scrollingNotifier = Scrollable.maybeOf(
+      context,
+    )?.position.isScrollingNotifier;
+    if (_scrollingNotifier != scrollingNotifier) {
+      _scrollingNotifier?.removeListener(_scrollChanged);
+      _scrollingNotifier = scrollingNotifier;
+      _scrollingNotifier?.addListener(_scrollChanged);
+    }
     _sync();
   }
 
@@ -114,6 +142,7 @@ class _AnimatedMediaState extends State<AnimatedMedia>
 
   void _reset() {
     _loadRevision++;
+    _contentRevision++;
     _loading = false;
     _error = null;
     _composition = null;
@@ -122,8 +151,28 @@ class _AnimatedMediaState extends State<AnimatedMedia>
     _preview?.dispose();
     _preview = null;
     _cycles = 0;
+    _scrollFrame = null;
     _animation.stop();
     _animation.value = 0;
+    _wakeLoading();
+  }
+
+  void _scrollChanged() {
+    _sync();
+    if (mounted) setState(() {});
+  }
+
+  void _wakeLoading() {
+    final resume = _resumeLoading;
+    _resumeLoading = null;
+    resume?.complete();
+  }
+
+  Future<bool> _waitUntilPresentable(int revision) async {
+    while (mounted && revision == _loadRevision && !_canPresent) {
+      await (_resumeLoading ??= Completer<void>()).future;
+    }
+    return mounted && revision == _loadRevision;
   }
 
   @override
@@ -146,7 +195,13 @@ class _AnimatedMediaState extends State<AnimatedMedia>
   }
 
   void _sync() {
-    final eligible = _visible && _foreground && _tickerEnabled;
+    final eligible = _canPresent;
+    if (_scrollPaused) {
+      _scrollFrame ??= _active ? _animation.value : _rest;
+    } else {
+      _scrollFrame = null;
+    }
+    if (eligible) _wakeLoading();
     final active =
         eligible &&
         !_reduceMotion &&
@@ -179,6 +234,7 @@ class _AnimatedMediaState extends State<AnimatedMedia>
       _animation.forward(from: 0);
     } else {
       _sync();
+      if (mounted) setState(() {});
     }
   }
 
@@ -193,10 +249,10 @@ class _AnimatedMediaState extends State<AnimatedMedia>
     RasterPlayback? raster;
     try {
       final bytes = await loader.load(item);
-      if (!mounted || revision != _loadRevision) return;
+      if (!await _waitUntilPresentable(revision)) return;
       if (item.format == MediaFormat.lottie) {
         final composition = await LottieCompositionCache.instance.decode(bytes);
-        if (!mounted || revision != _loadRevision) return;
+        if (!await _waitUntilPresentable(revision)) return;
         _composition = composition;
         _animation.duration = composition.duration;
         _rest = 0;
@@ -210,7 +266,7 @@ class _AnimatedMediaState extends State<AnimatedMedia>
       } else {
         raster = RasterPlayback();
         await raster.load(bytes);
-        if (!mounted || revision != _loadRevision) {
+        if (!await _waitUntilPresentable(revision)) {
           raster.dispose();
           return;
         }
@@ -255,12 +311,12 @@ class _AnimatedMediaState extends State<AnimatedMedia>
     final preview = RasterPlayback();
     try {
       final bytes = await loader.load(previewItem);
-      if (!mounted || revision != _loadRevision) {
+      if (!await _waitUntilPresentable(revision)) {
         preview.dispose();
         return;
       }
       await preview.load(bytes);
-      if (!mounted || revision != _loadRevision) {
+      if (!await _waitUntilPresentable(revision)) {
         preview.dispose();
         return;
       }
@@ -276,6 +332,8 @@ class _AnimatedMediaState extends State<AnimatedMedia>
   @override
   void dispose() {
     _loadRevision++;
+    _wakeLoading();
+    _scrollingNotifier?.removeListener(_scrollChanged);
     VisibilityDetectorController.instance.forget(_visibilityKey);
     WidgetsBinding.instance.removeObserver(this);
     widget.controller?.removeListener(_intentChanged);
@@ -287,6 +345,7 @@ class _AnimatedMediaState extends State<AnimatedMedia>
 
   @override
   Widget build(BuildContext context) {
+    assert(!widget.fadeDuration.isNegative);
     final fallback =
         widget.placeholder ??
         (_preview != null
@@ -301,19 +360,18 @@ class _AnimatedMediaState extends State<AnimatedMedia>
     if (_error != null) {
       content = widget.errorBuilder?.call(context, _error!) ?? fallback;
     } else if (_composition case final composition?) {
-      content = AnimatedBuilder(
-        animation: _animation,
-        builder: (context, _) => Lottie(
-          composition: composition,
-          animate: false,
-          controller: AlwaysStoppedAnimation(
-            _active ? _animation.value : _rest,
-          ),
-          width: widget.width,
-          height: widget.height,
-          fit: widget.fit,
-          // No unbounded per-view raster-frame cache.
-        ),
+      // Keep the Lottie widget/controller stable between frames. Its renderer
+      // already listens to progress and skips duplicate composition frames.
+      content = Lottie(
+        composition: composition,
+        animate: false,
+        controller: _active
+            ? _animation
+            : AlwaysStoppedAnimation(_scrollFrame ?? _rest),
+        width: widget.width,
+        height: widget.height,
+        fit: widget.fit,
+        // Lottie already adds a repaint boundary. No per-view frame cache.
       );
     } else if (_raster case final raster?) {
       content = RasterMediaFrame(
@@ -341,7 +399,30 @@ class _AnimatedMediaState extends State<AnimatedMedia>
           child: SizedBox(
             width: widget.width,
             height: widget.height,
-            child: content,
+            child: TickerMode(
+              enabled: _canPresent,
+              child: AnimatedSwitcher(
+                // Reset outgoing views before a different resource replaces
+                // their disposed codecs. Loading itself keeps the same key,
+                // so warm-cache loads also fade from the placeholder.
+                key: ValueKey((
+                  _contentRevision,
+                  _reduceMotion,
+                  widget.animate,
+                )),
+                duration: _reduceMotion || !widget.animate
+                    ? Duration.zero
+                    : widget.fadeDuration,
+                switchInCurve: Curves.easeInOut,
+                switchOutCurve: Curves.easeInOut,
+                child: KeyedSubtree(
+                  key: ValueKey(
+                    _error == null && (_composition != null || _raster != null),
+                  ),
+                  child: content,
+                ),
+              ),
+            ),
           ),
         ),
       ),

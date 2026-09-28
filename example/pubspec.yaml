@@ -21,8 +21,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - packages/animated_emoji/lottie/smile.json
-    - packages/animated_emoji/lottie/redHeart.json
-    - packages/animated_emoji/lottie/thumbsUpMedium.json
-    - packages/animated_emoji/lottie/rocket.json

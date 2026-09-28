@@ -1,14 +1,14 @@
-import 'package:animated_emoji/animated_emoji.dart' as noto;
 import 'package:characters/characters.dart';
 
 import '../models/media_item.dart';
 import '../models/media_source.dart';
 import 'local_media_catalog.dart';
+import 'noto_emoji_data.g.dart';
 
-/// Noto metadata from the pinned animated_emoji 3.3.0 catalog.
+/// A bundled snapshot of Google's animated Noto Emoji catalog.
 ///
-/// A declared package asset is preferred. Other supported entries use Google's
-/// mutable CDN and a bounded TTL; the catalog version is not an artwork hash.
+/// Every supported emoji has its own local Lottie JSON, including skin tones.
+/// Lookup and playback never require another emoji package or a remote CDN.
 final class NotoEmojiCatalog extends LocalMediaCatalog {
   NotoEmojiCatalog() : super(_entries) {
     _byUnicode = {for (final item in items) item.unicode!: item};
@@ -18,7 +18,7 @@ final class NotoEmojiCatalog extends LocalMediaCatalog {
   }
 
   static final NotoEmojiCatalog instance = NotoEmojiCatalog();
-  static const catalogVersion = 'animated_emoji-3.3.0';
+  static const catalogVersion = notoCatalogVersion;
   static final _attribution = MediaAttribution(
     author: 'Google',
     source: Uri.parse('https://googlefonts.github.io/noto-emoji-files/'),
@@ -26,28 +26,24 @@ final class NotoEmojiCatalog extends LocalMediaCatalog {
     licenseUrl: Uri.parse('https://creativecommons.org/licenses/by/4.0/'),
   );
   static final List<MediaItem> _entries = [
-    for (final base in noto.AnimatedEmojis.values)
-      for (final variant in base.variations)
-        MediaItem(
-          id: variant.id,
-          provider: 'google-noto',
-          version: catalogVersion,
-          name: variant.name,
-          kind: MediaKind.emoji,
-          format: MediaFormat.lottie,
-          unicode: variant.toUnicodeEmoji(),
-          width: 512,
-          height: 512,
-          categories: base.categories,
-          keywords: [...base.tags, base.name],
-          source: MediaSource.asset(
-            'packages/animated_emoji/lottie/${variant.name}.json',
-            fallbackUri: Uri.parse(
-              'https://fonts.gstatic.com/s/e/notoemoji/latest/${variant.id}/lottie.json',
-            ),
-          ),
-          attribution: _attribution,
+    for (final entry in notoEmojiEntries)
+      MediaItem(
+        id: entry.id,
+        provider: 'google-noto',
+        version: catalogVersion,
+        name: entry.name,
+        kind: MediaKind.emoji,
+        format: MediaFormat.lottie,
+        unicode: entry.unicode,
+        width: 512,
+        height: 512,
+        categories: entry.categories,
+        keywords: entry.keywords,
+        source: MediaSource.asset(
+          'packages/flutter_animated_media/assets/noto/lottie/${entry.id}.json',
         ),
+        attribution: _attribution,
+      ),
   ];
   late final Map<String, MediaItem> _byUnicode;
 
